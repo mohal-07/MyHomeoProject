@@ -1,0 +1,279 @@
+{# templates/new_case.html #}
+{% extends 'base_generic.html' %} {# Assuming you have a base template #}
+{% load static %} {# If needed for extra CSS/JS #}
+
+{% block title %}Create New Case{% endblock %}
+
+{% block head_extra %} {# Block to add specific CSS/JS in head #}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+<style>
+  {# --- Include or adapt Formbold Styles --- #}
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; padding-top: 70px;} /* Adjust padding for navbar */
+  .formbold-main-wrapper { padding: 20px; }
+  .formbold-form-wrapper { max-width: 850px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+  .formbold-form-title h2 { font-weight: 600; font-size: 24px; color: #07074d; margin-bottom: 8px;}
+  .formbold-form-title p { font-size: 15px; color: #536387; margin-bottom: 25px; }
+  .formbold-mb-3 { margin-bottom: 20px; }
+  .formbold-input-flex { display: flex; gap: 20px; margin-bottom: 20px; }
+  .formbold-input-flex > div { width: 50%; }
+  .formbold-form-label { color: #536387; font-size: 14px; display: block; margin-bottom: 8px; font-weight: 500; }
+  .formbold-form-input { width: 100%; padding: 12px 15px; border-radius: 5px; border: 1px solid #dde3ec; background: #ffffff; font-weight: 400; font-size: 15px; color: #333; outline: none; resize: vertical; } /* Allow textarea resize */
+  .formbold-form-input:focus { border-color: #6a64f1; box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.05); }
+  .formbold-btn { font-size: 16px; border-radius: 5px; padding: 14px 25px; border: none; font-weight: 500; background-color: #6a64f1; color: white; cursor: pointer; margin-top: 25px; display: block; width: 100%;}
+  .formbold-btn:hover { box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.1); }
+  .form-section-heading { font-size: 18px; font-weight: 600; color: #07074d; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+  .text-danger small { font-size: 0.8em; display: block; margin-top: 3px;} /* Style for field errors */
+  .illness-form { border: 1px dashed #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; background-color: #fdfdfd; position: relative; }
+  .illness-form .delete-button { position: absolute; top: 5px; right: 10px; }
+  .add-illness-btn { margin-top: 10px; }
+  .form-errors ul { list-style: none; padding-left: 0; color: #dc3545; } /* Style non-field errors */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="formbold-main-wrapper">
+  <div class="formbold-form-wrapper">
+    <form action="{% url 'core:new_case' %}" method="POST">
+      {% csrf_token %}
+
+      <div class="formbold-form-title">
+        <h2>New Case Details</h2>
+        <p>Fill in the patient and case information below.</p>
+      </div>
+
+      {# Display Non-Field Errors (from main form) #}
+      {% if form.non_field_errors %}
+          <div class="alert alert-danger form-errors">
+              {{ form.non_field_errors }}
+          </div>
+      {% endif %}
+      {# Display Non-Form Errors (from formset) #}
+       {% if illness_formset.non_form_errors %}
+          <div class="alert alert-danger form-errors">
+              {{ illness_formset.non_form_errors }}
+          </div>
+      {% endif %}
+
+
+      {# --- Patient Demographics --- #}
+      <h3 class="form-section-heading">Patient Information</h3>
+      <div class="formbold-input-flex">
+         <div>{{ form.patient_name.label_tag }}{{ form.patient_name }}{{ form.patient_name.errors|striptags }}</div>
+         <div>{{ form.patient_age.label_tag }}{{ form.patient_age }}{{ form.patient_age.errors|striptags }}</div>
+      </div>
+      <div class="formbold-input-flex">
+         <div>{{ form.patient_sex.label_tag }}{{ form.patient_sex }}{{ form.patient_sex.errors|striptags }}</div>
+         <div>{{ form.patient_occupation.label_tag }}{{ form.patient_occupation }}{{ form.patient_occupation.errors|striptags }}</div>
+      </div>
+       <div class="formbold-mb-3">{{ form.patient_address.label_tag }}{{ form.patient_address }}{{ form.patient_address.errors|striptags }}</div>
+      <div class="formbold-input-flex">
+         <div>{{ form.patient_phone.label_tag }}{{ form.patient_phone }}{{ form.patient_phone.errors|striptags }}</div>
+         <div>{{ form.opd_no.label_tag }}{{ form.opd_no }}{{ form.opd_no.errors|striptags }}</div>
+      </div>
+       <div class="formbold-mb-3">{{ form.date.label_tag }}{{ form.date }}{{ form.date.errors|striptags }}</div>
+
+
+      {# --- Presenting Complaints --- #}
+      <h3 class="form-section-heading">Presenting Complaints & History</h3>
+      <div class="formbold-mb-3">{{ form.presenting_complaints.label_tag }}{{ form.presenting_complaints }}{{ form.presenting_complaints.errors|striptags }}</div>
+      <div class="formbold-mb-3">{{ form.history_of_present_illness.label_tag }}{{ form.history_of_present_illness }}{{ form.history_of_present_illness.errors|striptags }}</div>
+
+
+      {# --- Past History --- #}
+      <h3 class="form-section-heading">Past History</h3>
+      <div class="formbold-mb-3">{{ form.past_history_vaccination.label_tag }}{{ form.past_history_vaccination }}{{ form.past_history_vaccination.errors|striptags }}</div>
+
+      {# --- Past Illness Formset --- #}
+      <h4>Past Illnesses</h4>
+      {{ illness_formset.management_form }} {# Required hidden fields for formset #}
+      <div id="illness-forms-container">
+          {% for illness_form in illness_formset %}
+              <div class="illness-form">
+                   {% if illness_form.instance.pk and illness_formset.can_delete %}
+                      <div class="form-check delete-button">
+                          {{ illness_form.DELETE }}
+                          <label class="form-check-label" for="{{ illness_form.DELETE.id_for_label }}">Delete</label>
+                      </div>
+                   {% endif %}
+                  {{ illness_form.id }} {# Hidden ID field if editing #}
+                  <div class="formbold-input-flex">
+                      <div>{{ illness_form.disease.label_tag }}{{ illness_form.disease }}{{ illness_form.disease.errors|striptags }}</div>
+                      <div>{{ illness_form.approximate_age.label_tag }}{{ illness_form.approximate_age }}{{ illness_form.approximate_age.errors|striptags }}</div>
+                  </div>
+                   <div class="formbold-mb-3">{{ illness_form.duration.label_tag }}{{ illness_form.duration }}{{ illness_form.duration.errors|striptags }}</div>
+                   <div class="formbold-mb-3">{{ illness_form.treatment.label_tag }}{{ illness_form.treatment }}{{ illness_form.treatment.errors|striptags }}</div>
+                   <div class="formbold-mb-3">{{ illness_form.completely_recovered.label_tag }}{{ illness_form.completely_recovered }}{{ illness_form.completely_recovered.errors|striptags }}</div>
+              </div>
+          {% endfor %}
+      </div>
+      {# Template for new forms added by JS #}
+      <div id="empty-illness-form" style="display: none;">
+           <div class="illness-form">
+               {{ illness_formset.empty_form.id }}
+              <div class="formbold-input-flex">
+                  <div>{{ illness_formset.empty_form.disease.label_tag }}{{ illness_formset.empty_form.disease }}</div>
+                  <div>{{ illness_formset.empty_form.approximate_age.label_tag }}{{ illness_formset.empty_form.approximate_age }}</div>
+              </div>
+               <div class="formbold-mb-3">{{ illness_formset.empty_form.duration.label_tag }}{{ illness_formset.empty_form.duration }}</div>
+               <div class="formbold-mb-3">{{ illness_formset.empty_form.treatment.label_tag }}{{ illness_formset.empty_form.treatment }}</div>
+               <div class="formbold-mb-3">{{ illness_formset.empty_form.completely_recovered.label_tag }}{{ illness_formset.empty_form.completely_recovered }}</div>
+                 {# Delete checkbox for dynamically added forms (handled by JS if needed, or let formset handle on submit) #}
+                 <button type="button" class="btn btn-danger btn-sm remove-illness-form" style="position: absolute; top: 5px; right: 10px;">X</button>
+          </div>
+      </div>
+      <button type="button" id="add-illness-button" class="btn btn-sm btn-outline-secondary add-illness-btn">Add Another Illness</button>
+      {# --- End Past Illness Formset --- #}
+
+
+      {# --- Other History Sections --- #}
+       <h3 class="form-section-heading">Family History</h3>
+       <div class="formbold-mb-3">{{ form.family_history.label_tag }}{{ form.family_history }}{{ form.family_history.errors|striptags }}</div>
+
+       <h3 class="form-section-heading">Personal History</h3>
+       <div class="formbold-input-flex">
+           <div>{{ form.personal_thermal_state.label_tag }}{{ form.personal_thermal_state }}{{ form.personal_thermal_state.errors|striptags }}</div>
+           <div>{{ form.personal_perspiration.label_tag }}{{ form.personal_perspiration }}{{ form.personal_perspiration.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.personal_appetite.label_tag }}{{ form.personal_appetite }}{{ form.personal_appetite.errors|striptags }}</div>
+           <div>{{ form.personal_diet.label_tag }}{{ form.personal_diet }}{{ form.personal_diet.errors|striptags }}</div>
+       </div>
+        <div class="formbold-input-flex">
+           <div>{{ form.personal_desire.label_tag }}{{ form.personal_desire }}{{ form.personal_desire.errors|striptags }}</div>
+           <div>{{ form.personal_aversion.label_tag }}{{ form.personal_aversion }}{{ form.personal_aversion.errors|striptags }}</div>
+       </div>
+        <div class="formbold-input-flex">
+           <div>{{ form.personal_thirst.label_tag }}{{ form.personal_thirst }}{{ form.personal_thirst.errors|striptags }}</div>
+           <div>{{ form.personal_urine.label_tag }}{{ form.personal_urine }}{{ form.personal_urine.errors|striptags }}</div>
+       </div>
+        <div class="formbold-input-flex">
+           <div>{{ form.personal_bowels.label_tag }}{{ form.personal_bowels }}{{ form.personal_bowels.errors|striptags }}</div>
+           <div>{{ form.personal_habits_addiction.label_tag }}{{ form.personal_habits_addiction }}{{ form.personal_habits_addiction.errors|striptags }}</div>
+       </div>
+       <div class="formbold-mb-3">{{ form.personal_sleep.label_tag }}{{ form.personal_sleep }}{{ form.personal_sleep.errors|striptags }}</div>
+       <div class="formbold-mb-3">{{ form.personal_dreams.label_tag }}{{ form.personal_dreams }}{{ form.personal_dreams.errors|striptags }}</div>
+       <div class="formbold-mb-3">{{ form.personal_other.label_tag }}{{ form.personal_other }}{{ form.personal_other.errors|striptags }}</div> {# <-- ADDED #}
+
+
+       <h3 class="form-section-heading">Menstrual History (if applicable)</h3>
+         <div class="formbold-input-flex">
+           <div>{{ form.menstrual_age_of_puberty.label_tag }}{{ form.menstrual_age_of_puberty }}{{ form.menstrual_age_of_puberty.errors|striptags }}</div>
+           <div>{{ form.menstrual_menses.label_tag }}{{ form.menstrual_menses }}{{ form.menstrual_menses.errors|striptags }}</div>
+       </div>
+        <div class="formbold-mb-3">{{ form.menstrual_menses_complaints.label_tag }}{{ form.menstrual_menses_complaints }}{{ form.menstrual_menses_complaints.errors|striptags }}</div>
+        <div class="formbold-input-flex">
+            <div>{{ form.menstrual_age_at_marriage.label_tag }}{{ form.menstrual_age_at_marriage }}{{ form.menstrual_age_at_marriage.errors|striptags }}</div>
+           <div>{{ form.menstrual_lmp.label_tag }}{{ form.menstrual_lmp }}{{ form.menstrual_lmp.errors|striptags }}</div>
+       </div>
+       <div class="formbold-mb-3">{{ form.menstrual_menses_triggers.label_tag }}{{ form.menstrual_menses_triggers }}{{ form.menstrual_menses_triggers.errors|striptags }}</div>
+        <div class="formbold-mb-3">{{ form.menstrual_leucorrhea.label_tag }}{{ form.menstrual_leucorrhea }}{{ form.menstrual_leucorrhea.errors|striptags }}</div>
+        <div class="formbold-mb-3">{{ form.menstrual_pregnancy.label_tag }}{{ form.menstrual_pregnancy }}{{ form.menstrual_pregnancy.errors|striptags }}</div>
+         <div class="formbold-input-flex">
+           <div>{{ form.menstrual_menopause_age.label_tag }}{{ form.menstrual_menopause_age }}{{ form.menstrual_menopause_age.errors|striptags }}</div>
+            <div> </div> {# Spacer #}
+       </div>
+        <div class="formbold-mb-3">{{ form.menstrual_menopause_complaints.label_tag }}{{ form.menstrual_menopause_complaints }}{{ form.menstrual_menopause_complaints.errors|striptags }}</div>
+
+       <h3 class="form-section-heading">Patient as Person (Mind/Disposition)</h3>
+       <div class="formbold-mb-3">{{ form.patient_as_person.label_tag }}{{ form.patient_as_person }}{{ form.patient_as_person.errors|striptags }}</div>
+
+       <h3 class="form-section-heading">Physical Examination</h3>
+         <div class="formbold-input-flex">
+           <div>{{ form.physical_built.label_tag }}{{ form.physical_built }}{{ form.physical_built.errors|striptags }}</div>
+           <div>{{ form.physical_head.label_tag }}{{ form.physical_head }}{{ form.physical_head.errors|striptags }}</div>
+       </div>
+        <div class="formbold-input-flex">
+            <div>{{ form.physical_throat.label_tag }}{{ form.physical_throat }}{{ form.physical_throat.errors|striptags }}</div>
+           <div>{{ form.physical_hair.label_tag }}{{ form.physical_hair }}{{ form.physical_hair.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_mouth.label_tag }}{{ form.physical_mouth }}{{ form.physical_mouth.errors|striptags }}</div>
+           <div>{{ form.physical_ear.label_tag }}{{ form.physical_ear }}{{ form.physical_ear.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_nails.label_tag }}{{ form.physical_nails }}{{ form.physical_nails.errors|striptags }}</div>
+           <div>{{ form.physical_tongue.label_tag }}{{ form.physical_tongue }}{{ form.physical_tongue.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_eyes.label_tag }}{{ form.physical_eyes }}{{ form.physical_eyes.errors|striptags }}</div>
+           <div>{{ form.physical_extremities.label_tag }}{{ form.physical_extremities }}{{ form.physical_extremities.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_teeth.label_tag }}{{ form.physical_teeth }}{{ form.physical_teeth.errors|striptags }}</div>
+           <div>{{ form.physical_skin.label_tag }}{{ form.physical_skin }}{{ form.physical_skin.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_lymph_glands.label_tag }}{{ form.physical_lymph_glands }}{{ form.physical_lymph_glands.errors|striptags }}</div>
+           <div>{{ form.physical_gums.label_tag }}{{ form.physical_gums }}{{ form.physical_gums.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_nose.label_tag }}{{ form.physical_nose }}{{ form.physical_nose.errors|striptags }}</div>
+           <div>{{ form.physical_bp.label_tag }}{{ form.physical_bp }}{{ form.physical_bp.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_temperature.label_tag }}{{ form.physical_temperature }}{{ form.physical_temperature.errors|striptags }}</div>
+           <div>{{ form.physical_pulse.label_tag }}{{ form.physical_pulse }}{{ form.physical_pulse.errors|striptags }}</div>
+       </div>
+       <div class="formbold-input-flex">
+           <div>{{ form.physical_rr.label_tag }}{{ form.physical_rr }}{{ form.physical_rr.errors|striptags }}</div>
+           <div>{{ form.physical_spo2.label_tag }}{{ form.physical_spo2 }}{{ form.physical_spo2.errors|striptags }}</div>
+       </div>
+        <div class="formbold-mb-3">{{ form.physical_other.label_tag }}{{ form.physical_other }}{{ form.physical_other.errors|striptags }}</div> {# <-- ADDED #}
+
+
+       <h3 class="form-section-heading">Systemic Examination</h3>
+       <div class="formbold-mb-3">{{ form.systemic_examination.label_tag }}{{ form.systemic_examination }}{{ form.systemic_examination.errors|striptags }}</div>
+
+
+      {# --- Submission Button --- #}
+      <button type="submit" class="formbold-btn">Submit Case for Analysis</button> {# Changed text #}
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %} {# Block to add JS at end of body #}
+<script>
+  // JavaScript for adding/removing new illness forms dynamically
+  document.addEventListener('DOMContentLoaded', function() {
+      const addIllnessButton = document.getElementById('add-illness-button');
+      const formsContainer = document.getElementById('illness-forms-container');
+      const emptyFormTemplate = document.getElementById('empty-illness-form').innerHTML;
+      const totalFormsInput = document.getElementById('id_{{ illness_formset.prefix }}-TOTAL_FORMS');
+
+      // Add Form
+      addIllnessButton.addEventListener('click', function() {
+          let currentFormCount = parseInt(totalFormsInput.value, 10);
+          let newFormHtml = emptyFormTemplate.replace(/__prefix__/g, currentFormCount);
+          let tempDiv = document.createElement('div');
+          tempDiv.innerHTML = newFormHtml.trim(); // Use trim to avoid potential whitespace issues
+          let newFormElement = tempDiv.firstElementChild; // Get the actual .illness-form div
+          formsContainer.appendChild(newFormElement);
+          totalFormsInput.value = currentFormCount + 1; // Increment count
+      });
+
+      // Remove Form (using event delegation)
+      formsContainer.addEventListener('click', function(event) {
+          if (event.target && event.target.classList.contains('remove-illness-form')) {
+              event.preventDefault();
+              let formToRemove = event.target.closest('.illness-form');
+              // If this form has a hidden DELETE input (meaning it came from the server initially),
+              // check the checkbox instead of removing the element completely.
+              let deleteCheckbox = formToRemove.querySelector('input[type="checkbox"][id$="-DELETE"]');
+              if (deleteCheckbox) {
+                  deleteCheckbox.checked = true;
+                  formToRemove.style.display = 'none'; // Hide it visually
+              } else {
+                  // If it's a new form (no DELETE checkbox), remove it from the DOM.
+                  formToRemove.remove();
+                  // Decrement total forms count - IMPORTANT for newly added forms
+                  // Note: Formset processing handles indices correctly even if we don't decrement MAX_NUM_FORMS
+                  // totalFormsInput.value = parseInt(totalFormsInput.value, 10) - 1; // Re-evaluate if decrementing is truly needed here
+              }
+          }
+      });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+{# templates/waiting.html #}
+{% extends 'base_generic.html' %}
+
+{% block title %}Processing Case {{ case.id }}{% endblock %}
+
+ {% block head_extra %}
+    <style>
+        .waiting-container { text-align: center; padding: 50px; }
+        .spinner-border { width: 3rem; height: 3rem; }
+        /* Add more engaging styles later */
+    </style>
+ {% endblock %}
+
+
+{% block content %}
+<div class="container waiting-container">
+    <h2>Processing Your Case (#{{ case.id }})</h2>
+    <p>Thank you for submitting the details for <strong>{{ case.patient_name|default:'the patient' }}</strong>.</p>
+    <p>Our AI is now analyzing the information. This process usually takes 1-2 minutes.</p>
+
+    <div class="spinner-border text-primary my-4" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+
+    <p>Current Status: <strong id="case-status">{{ case.get_status_display }}</strong></p>
+    <p>Please keep this page open. You will be able to view the results once processing is complete.</p>
+
+    <div id="results-button-container" style="display: none; margin-top: 20px;">
+         <a href="{% url 'core:case_detail' case.id %}" class="btn btn-success btn-lg">View Results</a>
+    </div>
+
+     <p style="margin-top: 30px;"><a href="{% url 'core:dashboard' %}">Go back to Dashboard</a> (Analysis will continue in the background)</p>
+
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const caseId = {{ case.id }};
+        const statusElement = document.getElementById('case-status');
+        const resultsButtonContainer = document.getElementById('results-button-container');
+        const checkStatusUrl = "{% url 'core:check_case_status' case.id %}"; // Get URL dynamically
+
+        function checkStatus() {
+            fetch(checkStatusUrl)
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Checked status:", data.status);
+                    if (statusElement) {
+                        statusElement.textContent = data.status_display || data.status; // Update status text
+                    }
+
+                    if (data.status === 'COMPLETED' || data.status === 'ERROR') {
+                        // Stop polling
+                        clearInterval(pollingInterval);
+                        // Show results button if completed
+                        if (data.status === 'COMPLETED' && resultsButtonContainer) {
+                            resultsButtonContainer.style.display = 'block';
+                            // Maybe hide the spinner here
+                            document.querySelector('.spinner-border')?.style.display = 'none';
+                        }
+                         // Optionally handle ERROR state display differently
+                         if (data.status === 'ERROR') {
+                             statusElement.style.color = 'red';
+                             // Maybe show an error message container
+                         }
+
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking status:', error);
+                    // Optionally stop polling on error or try again
+                });
+        }
+
+        // Start polling every 10 seconds (adjust interval as needed)
+        // But only if the initial status is not already completed/error
+        const initialStatus = "{{ case.status }}";
+        let pollingInterval;
+        if (initialStatus !== 'COMPLETED' && initialStatus !== 'ERROR') {
+             pollingInterval = setInterval(checkStatus, 10000); // 10000 ms = 10 seconds
+             // Also check immediately on load
+             checkStatus();
+        } else {
+             // If already completed/error on load, update UI immediately
+             statusElement.textContent = "{{ case.get_status_display }}";
+             if (initialStatus === 'COMPLETED') resultsButtonContainer.style.display = 'block';
+             if (initialStatus === 'ERROR') statusElement.style.color = 'red';
+             document.querySelector('.spinner-border')?.style.display = 'none';
+        }
+
+
+    });
+</script>
+{% endblock %}

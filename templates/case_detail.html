@@ -1,0 +1,395 @@
+{# templates/case_detail.html #}
+{% extends 'base_generic.html' %}
+{% load static %}
+{% load json_filters %} {# Load library containing replace_str, apply_formatting, is_dict, pprint #}
+
+{% block title %}Case Details - #{{ case.id }}{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+<style>
+    body { padding-top: 70px; background-color: #f8f9fa; }
+    /* --- Sidebar Styles (Basic - Improve as needed) --- */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1000; /* Higher z-index */
+        padding: 60px 0 0; /* Match navbar height */
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+        width: 240px;
+        background-color: #f8f9fa;
+        transition: transform 0.3s ease-in-out; /* For potential toggle animation */
+    }
+    .sidebar-sticky { height: calc(100vh - 60px); padding-top: .5rem; overflow-x: hidden; overflow-y: auto; }
+    main { padding: 30px; transition: margin-left 0.3s ease-in-out; margin-left: 250px; } /* Default margin */
+    /* --- End Sidebar Styles --- */
+
+    .detail-card { background-color: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .detail-card h3 { font-size: 1.3em; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; } /* Increased bottom margin */
+    .detail-label { font-weight: 600; color: #555; display: block; margin-bottom: 3px; font-size: 0.9em;}
+    .detail-value { color: #333; margin-bottom: 15px; white-space: pre-wrap; line-height: 1.6; }
+    .json-data-display { /* For displaying formatted JSON Input */
+        font-size: 0.95em;
+        line-height: 1.7;
+    }
+    .json-data-display .key { font-weight: 600; color: #444; display: block; margin-top: 8px; }
+    .json-data-display .value { margin-left: 15px; display: block; margin-bottom: 5px; color: #333;}
+    .json-data-display .value:empty::after { content: 'N/A'; color: #999; font-style: italic;} /* Show N/A for empty values */
+
+    .illness-item { border-bottom: 1px dotted #ccc; padding-bottom: 10px; margin-bottom: 10px; }
+    .illness-item:last-child { border-bottom: none; }
+
+    /* Results Section */
+    .results-section { border-top: 2px solid #6a64f1; padding-top: 20px; margin-top: 30px; }
+    .results-section h4 { font-size: 1.15em; font-weight: 600; margin-top: 25px; margin-bottom: 12px; color: #444; }
+    .results-section p, .results-section li { white-space: pre-wrap; line-height: 1.6;}
+    .results-section ul { padding-left: 25px; margin-top: 8px; margin-bottom: 15px;}
+    .results-section dl dt { font-weight: 600; color: #555; margin-top: 10px; }
+    .results-section dl dd { margin-left: 20px; margin-bottom: 10px; }
+    .result-block { margin-bottom: 30px; }
+
+    /* Repertorization Styles */
+    .repertory-block ul { list-style-type: none; padding-left: 0; } /* No bullets needed for these lists */
+    /* Style for Rubric List Items */
+    .repertory-block .rubric-list-item {
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .repertory-block .rubric-list-item:last-child { border-bottom: none; }
+    .repertory-rubric { font-family: monospace; font-size: 0.95em; display: block; }
+    .repertory-rubric strong { color: #1a237e; }
+    /* Justification - kept as block, indented */
+    .repertory-justification { font-size: 0.85em; color: #666; font-style: italic; margin-left: 15px; display: block; margin-top: 3px;}
+    /* Style for Chart Summary List Items */
+    .repertory-chart-summary-list li {
+        margin-bottom: 4px; /* Tighter list */
+        padding-bottom: 2px;
+        border-bottom: none;
+        line-height: 1.5;
+    }
+    .repertory-chart-summary-list strong { color: #004d40; margin-right: 5px;} /* Space after remedy name */
+    .repertory-chart-summary-list span { /* Details span */
+        display: inline; /* Ensure it stays on the same line */
+        margin-left: 5px;
+        font-size: 0.95em;
+        color: #555;
+    }
+
+    /* Prescription Blocks */
+    .prescription-block { background-color: #eaf2ff; padding: 20px; border-radius: 5px; border-left: 5px solid #6a64f1; margin-top: 15px; }
+    .prescription-block strong { color: #333; }
+    .allopathic-block { background-color: #fff8e1; padding: 20px; border-radius: 5px; border-left: 5px solid #ffc107; margin-top: 15px; }
+
+    .status-display { font-weight: bold; }
+    .status-PENDING, .status-PROCESSING { color: #0d6efd; }
+    .status-COMPLETED { color: #198754; }
+    .status-ERROR { color: #dc3545; }
+
+    /* Responsive CSS */
+    @media (max-width: 767.98px) {
+        .sidebar {
+            transform: translateX(-100%);
+        }
+        main {
+            margin-left: 0;
+        }
+        .detail-col-left, .detail-col-right {
+            width: 100%;
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+     {# --- Sidebar --- #}
+     <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+        <div class="position-sticky pt-3 sidebar-sticky">
+            <ul class="nav flex-column">
+                <li class="nav-item"> <a class="nav-link" href="{% url 'core:dashboard' %}"><span data-feather="home"></span> Case History</a></li>
+                <li class="nav-item"> <a class="nav-link" href="{% url 'core:new_case' %}"><span data-feather="file-plus"></span> New Case</a></li>
+                <li class="nav-item"> <span class="nav-link active" aria-current="page"><span data-feather="file-text"></span> Case #{{ case.id }}</span></li>
+            </ul>
+        </div>
+     </nav>
+     {# --- End Sidebar --- #}
+
+     {# --- Main Content --- #}
+     <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Case Details: #{{ case.id }}</h1>
+            <span class="status-display status-{{ case.status }}">Status: {{ case.get_status_display }}</span>
+        </div>
+
+        {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endif %}
+        {% if error_message and not results_data %}<div class="alert alert-warning" role="alert"> {{ error_message }} </div>{% endif %}
+
+        <div class="row">
+            {# --- Left Column: Basic Info & History --- #}
+            <div class="col-lg-6 detail-col-left">
+                <div class="detail-card">
+                    <h3>Patient Information</h3>
+                    <span class="detail-label">Name:</span> <p class="detail-value">{{ case.patient_name|default:"N/A" }}</p>
+                    <span class="detail-label">Age:</span> <p class="detail-value">{{ case.patient_age|default:"N/A" }}</p>
+                    <span class="detail-label">Sex:</span> <p class="detail-value">{{ case.patient_sex|default:"N/A" }}</p>
+                    <span class="detail-label">Occupation:</span> <p class="detail-value">{{ case.patient_occupation|default:"N/A" }}</p>
+                    <span class="detail-label">Address:</span> <p class="detail-value">{{ case.patient_address|default:"N/A" }}</p>
+                    <span class="detail-label">Phone:</span> <p class="detail-value">{{ case.patient_phone|default:"N/A" }}</p>
+                    <span class="detail-label">OPD No:</span> <p class="detail-value">{{ case.opd_no|default:"N/A" }}</p>
+                    <span class="detail-label">Date Recorded:</span> <p class="detail-value">{{ case.date|date:"Y-m-d"|default:"N/A" }}</p>
+                </div>
+
+                <div class="detail-card">
+                    <h3>Complaint & Present History</h3>
+                    <span class="detail-label">Presenting Complaints:</span> <p class="detail-value">{{ case.presenting_complaints|default:"N/A" }}</p>
+                    <span class="detail-label">History of Present Illness:</span> <p class="detail-value">{{ case.history_of_present_illness|default:"N/A" }}</p>
+                 </div>
+
+                <div class="detail-card">
+                    <h3>Past History</h3>
+                    <span class="detail-label">Vaccination History:</span>
+                    <p class="detail-value">{{ case.past_history_vaccination|default:"N/A" }}</p>
+                    <span class="detail-label">Past Illnesses:</span>
+                    {% for illness in case.past_illnesses.all %}
+                        <div class="illness-item">
+                            <strong>{{ illness.disease|default:"Unnamed Illness" }}</strong>
+                            {% if illness.approximate_age %}<span class="text-muted"> (Age: {{ illness.approximate_age }})</span>{% endif %}
+                            {% if illness.duration %}<br><span class="detail-label" style="display: inline;">Duration:</span> {{ illness.duration }}{% endif %}
+                            {% if illness.treatment %}<br><span class="detail-label" style="display: inline;">Treatment:</span> {{ illness.treatment }}{% endif %}
+                            {% if illness.completely_recovered %}<br><span class="detail-label" style="display: inline;">Recovered:</span> {{ illness.completely_recovered }}{% endif %}
+                        </div>
+                    {% empty %}
+                        <p class="detail-value">No past illnesses recorded.</p>
+                    {% endfor %}
+                </div>
+
+                <div class="detail-card">
+                     <h3>Family History</h3>
+                     <p class="detail-value">{{ case.family_history|default:"N/A" }}</p>
+                </div>
+
+                 <div class="detail-card">
+                     <h3>Patient as Person</h3>
+                     <p class="detail-value">{{ case.patient_as_person|default:"N/A" }}</p>
+                 </div>
+
+                 <div class="detail-card">
+                     <h3>Systemic Examination</h3>
+                     <p class="detail-value">{{ case.systemic_examination|default:"N/A" }}</p>
+                 </div>
+
+                 <div class="detail-card">
+                    <h3>Input History Notes (Other)</h3>
+                    <span class="detail-label">Other Personal History Notes:</span>
+                    <p class="detail-value">{{ case.personal_history.other|default:"None" }}</p>
+                     <span class="detail-label" style="margin-top: 15px;">Other Physical Examination Notes:</span>
+                    <p class="detail-value">{{ case.physical_examination.other|default:"None" }}</p>
+                </div>
+
+            </div>
+
+
+            {# --- Right Column: Structured Input Data & AI Results --- #}
+            <div class="col-lg-6 detail-col-right">
+                {# --- Display Input JSON Data Nicely --- #}
+                <div class="detail-card">
+                    <h3>Personal History</h3> {# Removed (Input) #}
+                    <div class="json-data-display">
+                        {% for key, value in case.personal_history.items %}
+                           {% if value %}
+                           <span class="key">{{ key|capfirst|replace_str:"_, " }}:</span>
+                           <span class="value">{{ value }}</span>
+                           {% endif %}
+                        {% empty %}
+                           <p class="text-muted">No personal history details recorded.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                 <div class="detail-card">
+                    <h3>Menstrual History</h3> {# Removed (Input) #}
+                    <div class="json-data-display">
+                        {% for key, value in case.menstrual_history.items %}
+                           {% if key == 'menopause' and value|is_dict %}
+                               <span class="key">Menopause:</span>
+                               {% if value.age or value.complaints %}
+                                   <span class="value" style="margin-left: 25px;"><span class="key" style="display: inline;">Age:</span> {{ value.age|default:"N/A" }}</span>
+                                   <span class="value" style="margin-left: 25px;"><span class="key" style="display: inline;">Complaints:</span> {{ value.complaints|default:"N/A" }}</span>
+                               {% else %}
+                                    <span class="value" style="margin-left: 25px;">N/A</span>
+                               {% endif %}
+                           {% elif value %}
+                               <span class="key">{{ key|capfirst|replace_str:"_, " }}:</span>
+                               <span class="value">{{ value }}</span>
+                           {% endif %}
+                        {% empty %}
+                           <p class="text-muted">No menstrual history details recorded.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                 <div class="detail-card">
+                    <h3>Physical Examination</h3> {# Removed (Input) #}
+                    <div class="json-data-display">
+                        {% for key, value in case.physical_examination.items %}
+                            {% if value %}
+                            <span class="key">{{ key|capfirst|replace_str:"_, " }}:</span>
+                            <span class="value">{{ value }}</span>
+                            {% endif %}
+                        {% empty %}
+                            <p class="text-muted">No physical examination details recorded.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                 {# --- End Input JSON Data Display --- #}
+
+                {# --- AI Results Section --- #}
+                {% if results_data %}
+                <div class="detail-card results-section">
+                    <h3 style="color: #6a64f1;">AI Analysis Results</h3>
+
+                    {% with analysis=results_data.analysis_and_evaluation_of_symptoms %}
+                        {% if analysis %}<div class="result-block"><h4>Analysis & Evaluation:</h4><p>{{ analysis|apply_formatting }}</p></div>{% endif %}
+                    {% endwith %}
+
+                     {% with miasm=results_data.miasmatic_assessment %}
+                        {% if miasm %}<div class="result-block"><h4>Miasmatic Assessment:</h4><p>{{ miasm|apply_formatting }}</p></div>{% endif %}
+                     {% endwith %}
+
+                     {% if case_type_value %}<div class="result-block"><h4>Case Type (Acute/Chronic):</h4><p>{{ case_type_value|apply_formatting }}</p></div>{% endif %}
+
+                    {% with diag=results_data.provisional_diagnosis %}
+                        {% if diag %}
+                        <div class="result-block">
+                            <h4>Provisional Diagnosis:</h4>
+                            {% if diag|is_dict %}
+                                <span class="detail-label">Clinical:</span> <p class="detail-value">{{ diag.conventional|default:"N/A" }}</p>
+                                <span class="detail-label">Homeopathic:</span> <p class="detail-value">{{ diag.homeopathic|default:"N/A" }}</p>
+                            {% else %}
+                                <p>{{ diag|apply_formatting }}</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endwith %}
+
+                     {% with diff_diag=results_data.differential_diagnosis %}
+                        {% if diff_diag %}<div class="result-block"><h4>Differential Diagnosis:</h4><p>{{ diff_diag|apply_formatting }}</p></div>{% endif %}
+                     {% endwith %}
+
+                     {% with final_diag=results_data.final_diagnosis %}
+                        {% if final_diag %}<div class="result-block"><h4>Final Diagnosis:</h4><p>{{ final_diag|apply_formatting }}</p></div>{% endif %}
+                     {% endwith %}
+
+                    {# --- Revised Repertorization Display --- #}
+                    {% with repertory=results_data.repertorization_analysis %}
+                        {% if repertory and repertory|is_dict %}
+                        <div class="result-block repertory-block">
+                            <h4>Repertorization Analysis:</h4>
+                            {% if repertory.strategy %} <p><strong>Strategy:</strong> {{ repertory.strategy|apply_formatting }}</p> {% endif %}
+
+                            {% if repertory.selected_rubrics %}
+                                <p style="margin-bottom: 5px;"><strong>Selected Rubrics:</strong></p>
+                                <ul>
+                                {% for rubric_item in repertory.selected_rubrics %}
+                                    <li class="rubric-list-item"> {# Added specific class #}
+                                        <span class="repertory-rubric"><strong>{{ rubric_item.rubric|default:'N/A' }}</strong>{% if rubric_item.intensity %}<span class="text-muted"> ({{ rubric_item.intensity }})</span>{% endif %}</span>
+                                        {% if rubric_item.justification %}<span class="repertory-details repertory-justification">{{ rubric_item.justification|apply_formatting }}</span>{% endif %}
+                                    </li>
+                                {% empty %}
+                                    <li>No rubrics listed.</li>
+                                {% endfor %}
+                                </ul>
+                            {% endif %}
+
+                             {% if repertory.repertorization_chart_summary %}
+                                <p style="margin-top: 15px; margin-bottom: 5px;"><strong>Repertorization Chart Summary:</strong></p>
+                                <ul class="repertory-chart-summary-list"> {# Added specific class #}
+                                {% for remedy_summary in repertory.repertorization_chart_summary %}
+                                    {# Display on single line #}
+                                    <li>
+                                        <strong>{{ remedy_summary.remedy|default:'N/A' }}:</strong>
+                                        <span> Score: {{ remedy_summary.score|default:'N/A' }}; Covered: {{ remedy_summary.symptoms_covered|default:'N/A' }} </span>
+                                    </li>
+                                {% empty %}
+                                     <li>No chart summary provided.</li>
+                                {% endfor %}
+                                </ul>
+                            {% endif %}
+
+                            {% if repertory.notes %} <p style="margin-top: 15px;"><strong>Notes:</strong> {{ repertory.notes|apply_formatting }}</p> {% endif %}
+                        </div>
+                        {% elif repertory %}
+                        <div class="result-block"> <h4>Repertorization Analysis:</h4> <p>{{ repertory|apply_formatting }}</p> </div>
+                        {% endif %}
+                    {% endwith %}
+                    {# --- END: Repertorization Display --- #}
+
+                    {% with remedies=results_data.group_of_remedies %}
+                        {% if remedies %}
+                        <div class="result-block">
+                            <h4>Group of Potential Remedies (Differentiation):</h4>
+                            <ul> {% for remedy_info in remedies %}<li>{{ remedy_info|apply_formatting }}</li>{% empty %}<li>No remedies listed.</li>{% endfor %} </ul>
+                        </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    {# --- Homeopathic Prescription Block --- #}
+                    {% with pres=results_data.homeopathic_prescription %}
+                        {% if pres %}
+                        <div class="result-block prescription-block">
+                            <h4>Homeopathic Prescription:</h4>
+                            {% if pres|is_dict %}
+                                 <p><strong>Remedy:</strong> {{ pres.remedy|default:"N/A" }}</p>
+                                 <p><strong>Potency:</strong> {{ pres.potency|default:"N/A" }}</p>
+                                 <p><strong>Posology:</strong> {{ pres.posology|default:"N/A" }}</p>
+                                 {% if pres.justification %}<p><strong>Justification:</strong> {{ pres.justification|apply_formatting }}</p>{% endif %}
+                            {% elif pres %} <p>{{ pres|apply_formatting }}</p>
+                            {% else %} <p>No details provided.</p> {% endif %}
+                        </div>
+                        {% else %} <p class="text-muted">No homeopathic prescription available.</p> {% endif %}
+                    {% endwith %}
+
+                    {# --- Allopathic Suggestion Block --- #}
+                    {% with allo_pres=results_data.allopathic_prescription_suggestion %}
+                        {% if allo_pres and allo_pres|is_dict %}
+                             {% if allo_pres.drug or allo_pres.indication %}
+                                <div class="result-block allopathic-block">
+                                    <h4>Allopathic Suggestion (Optional):</h4>
+                                    {% if allo_pres.indication %}<p><strong>Indication:</strong> {{ allo_pres.indication|apply_formatting }}</p>{% endif %}
+                                    {% if allo_pres.drug %}<p><strong>Drug:</strong> {{ allo_pres.drug|apply_formatting }}</p>{% endif %}
+                                    {% if allo_pres.dose %}<p><strong>Dose:</strong> {{ allo_pres.dose|apply_formatting }}</p>{% endif %}
+                                    {% if allo_pres.route %}<p><strong>Route:</strong> {{ allo_pres.route|apply_formatting }}</p>{% endif %}
+                                    {% if allo_pres.frequency %}<p><strong>Frequency:</strong> {{ allo_pres.frequency|apply_formatting }}</p>{% endif %}
+                                    {% if allo_pres.duration %}<p><strong>Duration:</strong> {{ allo_pres.duration|apply_formatting }}</p>{% endif %}
+                                    {% if allo_pres.justification_or_notes %}<p><strong>Notes:</strong> {{ allo_pres.justification_or_notes|apply_formatting }}</p>{% endif %}
+                                </div>
+                             {% endif %}
+                        {% elif allo_pres and allo_pres != "N/A" %}
+                            <div class="result-block"> <h4>Allopathic Suggestion:</h4> <p class="text-muted">{{ allo_pres|apply_formatting }}</p> </div>
+                        {% endif %}
+                    {% endwith %}
+
+                </div>
+                {% elif not error_message %}
+                     <div class="alert alert-secondary" role="alert"> No analysis results found. Status: {{ case.get_status_display }}. </div>
+                {% endif %}
+                {# --- End AI Results Section --- #}
+
+            </div> {# End Right Column #}
+        </div> {# End row #}
+     </main> {# End main content #}
+   </div> {# End outer row #}
+</div> {# End container-fluid #}
+
+{% endblock %}
+
+ {% block scripts_extra %}
+    {# Add Feather Icons JS if used #}
+    {# <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script> #}
+    {# <script>if (typeof feather !== 'undefined') { feather.replace() }</script> #} {# Safe check #}
+ {% endblock %}
